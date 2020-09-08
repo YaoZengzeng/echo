@@ -1,0 +1,7 @@
+apiVersion: testapp.my.domain/v1
+kind: Echo
+metadata:
+  name: echo-sample
+spec:
+  # Add fields here
+  foo: bar
