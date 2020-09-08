@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,19 +29,30 @@ type EchoSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Echo. Edit Echo_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	APIVersion string `json:"apiVersion"`
+
+	Kind string `json:"kind"`
+
+	Name string `json:"name"`
+
+	// Not all objects are required to be scoped to a namespace - the value of this field for
+	// those objects will be empty.
+	Namespace string `json:"namespace,omitempty"`
+
+	RefPath string `json:"refPath"`
 }
 
 // EchoStatus defines the observed state of Echo
 type EchoStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Data v1beta1.JSON `json:"data"`
 }
 
 // +kubebuilder:object:root=true
 
 // Echo is the Schema for the echoes API
+// +kubebuilder:subresource:status
 type Echo struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

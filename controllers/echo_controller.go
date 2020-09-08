@@ -18,9 +18,14 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,10 +43,65 @@ type EchoReconciler struct {
 // +kubebuilder:rbac:groups=testapp.my.domain,resources=echoes/status,verbs=get;update;patch
 
 func (r *EchoReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("echo", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("echo", req.NamespacedName)
 
-	// your logic here
+	var echo testappv1.Echo
+	if err := r.Get(ctx, req.NamespacedName, &echo); err != nil {
+		log.Error(err, "unable to fetch Echo")
+
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	log.V(1).Info("Get echo successfully", "echo entity", fmt.Sprintf("%v", echo))
+
+	resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": echo.Spec.APIVersion,
+			"kind":       echo.Spec.Kind,
+		},
+	}
+
+	nn := types.NamespacedName{
+		Name:      echo.Spec.Name,
+		Namespace: echo.Spec.Namespace,
+	}
+
+	if err := r.Get(ctx, nn, resource); err != nil {
+		log.Error(err, "unable to fetch specified resource")
+
+		return ctrl.Result{}, err
+	}
+
+	field, found, err := unstructured.NestedFieldCopy(resource.Object, strings.Split(echo.Spec.RefPath, ".")...)
+	if err != nil {
+		log.Error(err, "failed to get nested field")
+
+		return ctrl.Result{}, err
+	}
+
+	if !found {
+		log.Error(fmt.Errorf("refpath not exist"), "failed to get refpath")
+
+		return ctrl.Result{}, err
+	}
+
+	fieldData, err := json.Marshal(field)
+	if err != nil {
+		log.Error(err, "marshal field failed")
+
+		return ctrl.Result{}, err
+	}
+
+	log.V(1).Info("Get RefPath successfully", "RefPath", string(fieldData))
+
+	echo.Status.Data.Raw = fieldData
+
+	if err := r.Status().Update(ctx, &echo); err != nil {
+		log.Error(err, "unable to update echo status")
+
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
